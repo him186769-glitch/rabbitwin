@@ -1,0 +1,507 @@
+```html
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚽ 스퍼트(SPURT) | 축구 승무패 맞추기 게임</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Pretendard', sans-serif;
+            background-color: #0f172a; /* 딥 네이비 스타디움 배경색 */
+            color: #f8fafc;
+        }
+        /* 점수 상승/하락 애니메이션 효과 */
+        .score-up {
+            animation: bounceUp 0.8s ease-out forwards;
+            color: #4ade80;
+        }
+        .score-down {
+            animation: shakeDown 0.8s ease-out forwards;
+            color: #f87171;
+        }
+        @keyframes bounceUp {
+            0% { transform: translateY(10px); opacity: 0; }
+            50% { transform: translateY(-10px); opacity: 1; }
+            100% { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes shakeDown {
+            0% { transform: translateX(0); opacity: 0; }
+            25% { transform: translateX(-5px); opacity: 1; }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-3px); }
+            100% { transform: translateX(0); opacity: 1; }
+        }
+        /* 우승자 하이라이트 골드 아우라 효과 */
+        .winner-card {
+            box-shadow: 0 0 25px #f59e0b;
+            border: 2px solid #f59e0b;
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-12">
+
+    <header class="bg-slate-900 border-b border-slate-800 py-6 text-center shadow-lg sticky top-0 z-50">
+        <h1 class="text-3xl font-extrabold text-emerald-400 flex justify-center items-center gap-2">
+            <i class="fa-solid fa-soccer-ball animate-spin" style="animation-duration: 6s;"></i>
+            <span>SPURT 승무패 챌린지</span>
+        </h1>
+        <p class="text-xs text-slate-400 mt-1">친구들과 함께 예측하고 실시간으로 랭킹을 확인해보세요!</p>
+        
+        <div class="mt-4 flex flex-wrap justify-center items-center gap-3 px-4">
+            <span id="roomStatusBadge" class="bg-slate-800 text-slate-400 text-xs px-3 py-1.5 rounded-full font-semibold border border-slate-700">
+                <i class="fa-solid fa-door-closed mr-1"></i> 대기실 생성 필요
+            </span>
+            <span id="roundBadge" class="bg-emerald-950 text-emerald-400 text-xs px-3 py-1.5 rounded-full font-semibold border border-emerald-800 hidden">
+                <i class="fa-solid fa-trophy mr-1"></i> 현재 라운드: <span id="currentRoundText">미정</span>
+            </span>
+            <div id="progressBarContainer" class="w-48 bg-slate-800 rounded-full h-2.5 hidden border border-slate-700">
+                <div id="progressBar" class="bg-emerald-500 h-2.5 rounded-full transition-all duration-500" style="width: 0%"></div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <div class="lg:col-span-2 space-y-6">
+            
+            <section id="step1-section" class="bg-slate-800/90 border border-slate-700 p-6 rounded-2xl shadow-xl transition-all">
+                <h2 class="text-xl font-bold mb-4 flex items-center text-slate-200">
+                    <span class="bg-emerald-500 text-slate-900 text-xs w-6 h-6 rounded-full flex items-center justify-center font-bold mr-2">1</span>
+                    게임 룸 생성하기
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-400 mb-1">참가자 닉네임 (쉼표로 구분)</label>
+                        <input type="text" id="playerNamesInput" placeholder="손흥민, 이강인, 김민재" 
+                               class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-400 mb-1">경기 라운드 선택</label>
+                        <select id="roundSelect" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-emerald-500">
+                            <option value="프리미어리그 1R">프리미어리그 1R (3경기)</option>
+                            <option value="챔피언스리그 예선">챔피언스리그 예선 (3경기)</option>
+                            <option value="한일전 매치 데이">한일전 매치 데이 (3경기)</option>
+                        </select>
+                    </div>
+                </div>
+                <button onclick="createRoom()" class="w-full mt-4 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold py-3 px-4 rounded-xl transition-all shadow-lg flex justify-center items-center gap-2">
+                    <i class="fa-solid fa-circle-plus"></i> 축구 예측방 개설하기
+                </button>
+            </section>
+
+            <section id="step2-section" class="bg-slate-800/90 border border-slate-700 p-6 rounded-2xl shadow-xl hidden transition-all">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold flex items-center text-slate-200">
+                        <span class="bg-emerald-500 text-slate-900 text-xs w-6 h-6 rounded-full flex items-center justify-center font-bold mr-2">2</span>
+                        승무패 및 스코어 예측 제출
+                    </h2>
+                    <span id="turnIndicator" class="bg-amber-400 text-slate-950 text-xs font-bold px-3 py-1 rounded-md">
+                        차례: <span id="currentPlayerName">-</span>
+                    </span>
+                </div>
+                
+                <p class="text-sm text-slate-400 mb-4 bg-slate-900/60 p-3 rounded-lg border border-slate-700/50">
+                    💡 맞추면 <span class="text-emerald-400 font-bold">+10점</span>, 틀리면 <span class="text-rose-400 font-bold">-5점</span> 획득! 
+                    정확한 스코어까지 맞추면 보너스 <span class="text-amber-400 font-bold">+5점</span>!
+                </p>
+
+                <div id="matchCardsContainer" class="space-y-4"></div>
+
+                <button onclick="submitPrediction()" class="w-full mt-6 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-lg flex justify-center items-center gap-2">
+                    <i class="fa-solid fa-paper-plane"></i> 예측 데이터 최종 제출
+                </button>
+            </section>
+
+            <section id="step3-section" class="bg-slate-800/90 border border-slate-700 p-6 rounded-2xl shadow-xl hidden transition-all">
+                <h2 class="text-xl font-bold mb-2 flex items-center text-slate-200">
+                    <span class="bg-emerald-500 text-slate-900 text-xs w-6 h-6 rounded-full flex items-center justify-center font-bold mr-2">3</span>
+                    실제 경기 결과 입력 (관리자 모드)
+                </h2>
+                <p class="text-xs text-slate-400 mb-4">모든 참가자의 예측이 마감되었습니다. 실제 스코어를 입력하여 채점을 진행하세요.</p>
+                
+                <div id="resultCardsContainer" class="space-y-4"></div>
+
+                <button onclick="calculateScores()" class="w-full mt-6 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold py-3 px-4 rounded-xl transition-all shadow-lg flex justify-center items-center gap-2">
+                    <i class="fa-solid fa-calculator"></i> 실시간 결과 정산 및 채점하기
+                </button>
+            </section>
+
+        </div>
+
+        <div class="space-y-6">
+            <section class="bg-slate-800/90 border border-slate-700 p-6 rounded-2xl shadow-xl sticky top-28">
+                <h2 class="text-xl font-bold mb-4 flex items-center text-slate-200 border-b border-slate-700 pb-3">
+                    <i class="fa-solid fa-ranking-star text-amber-400 mr-2"></i>
+                    실시간 랭킹 보드
+                </h2>
+                
+                <div id="rankingList" class="space-y-3">
+                    <p class="text-center text-slate-500 text-sm py-8">아직 개설된 방이 없습니다.</p>
+                </div>
+
+                <div id="winnerHighlight" class="mt-6 p-4 rounded-xl bg-slate-900/80 border border-slate-700 hidden transition-all duration-1000">
+                    <div class="text-center">
+                        <span class="inline-block bg-amber-500 text-slate-950 text-xs font-black px-3 py-0.5 rounded-full uppercase tracking-wider mb-2 animate-bounce">
+                            👑 최종 단독 우승 후보
+                        </span>
+                        <h3 id="winnerName" class="text-2xl font-black text-amber-400">-</h3>
+                        <p class="text-xs text-slate-400 mt-1">동점 기준(마지막 라운드 성적 및 제출시간) 적용 최강자</p>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+    </main>
+
+    <div id="toast" class="fixed bottom-5 right-5 bg-rose-600 text-white px-5 py-3 rounded-xl shadow-2xl opacity-0 transform translate-y-2 transition-all duration-300 pointer-events-none z-50 flex items-center gap-2">
+        <i class="fa-solid fa-circle-exclamation"></i>
+        <span id="toastMessage">오류 메시지 내용</span>
+    </div>
+
+    <script>
+        // 고정 경기 데이터셋 (고등학생들이 가장 흥미로워할 매치 구성)
+        const sampleMatches = [
+            { id: 1, home: "토트넘", away: "아스날", homeLogo: "⚪", awayLogo: "🔴" },
+            { id: 2, home: "맨시티", away: "리버풀", homeLogo: "🩵", awayLogo: "❤️" },
+            { id: 3, home: "레알 마드리드", away: "바르셀로나", homeLogo: "👑", awayLogo: "🔵" }
+        ];
+
+        // 어플리케이션 상태 전역 관리 데이터
+        let players = [];
+        let currentPlayerIndex = 0;
+        let selectedRound = "";
+        let predictionsData = {}; // 각 유저별 예측 스코어 저장 구조
+        let scoresAnimationState = {}; // 애니메이션 직전 이전 점수 백업
+
+        // 친절한 경고 토스트 팝업 함수
+        function showToast(message) {
+            const toast = document.getElementById("toast");
+            document.getElementById("toastMessage").innerText = message;
+            toast.classList.remove("opacity-0", "translate-y-2");
+            toast.classList.add("opacity-100", "translate-y-0");
+            
+            setTimeout(() => {
+                toast.classList.remove("opacity-100", "translate-y-0");
+                toast.classList.add("opacity-0", "translate-y-2");
+            }, 3000);
+        }
+
+        // 1단계: 닉네임 입력 후 방 만들기 프로세스
+        function createRoom() {
+            const namesInput = document.getElementById("playerNamesInput").value.trim();
+            selectedRound = document.getElementById("roundSelect").value;
+
+            // [빈 입력 유효성 검사 및 친절한 경고]
+            if (!namesInput) {
+                showToast("친구들의 닉네임을 최소 한 명 이상 입력해 주세요!");
+                return;
+            }
+
+            // 쉼표 분할 파싱 및 공백 제거 처리
+            const nameArray = namesInput.split(",").map(n => n.trim()).filter(n => n.length > 0);
+            
+            if (nameArray.length === 0) {
+                showToast("유효한 닉네임이 존재하지 않습니다.");
+                return;
+            }
+
+            // 플레이어 객체 구조 생성 (점수, 승률, 타임스탬프 기록 초기화)
+            players = nameArray.map(name => ({
+                name: name,
+                score: 0,
+                correctCount: 0,
+                totalCount: sampleMatches.length,
+                winRate: 0,
+                submitTime: null // 동점자 순위 정밀 처리용
+            }));
+
+            currentPlayerIndex = 0;
+            predictionsData = {};
+
+            // 상단 진행도/배지 UI 업데이트
+            document.getElementById("roomStatusBadge").innerHTML = `<i class="fa-solid fa-door-open text-emerald-400"></i> 게임 진행 중`;
+            document.getElementById("roomStatusBadge").className = "bg-emerald-950 text-emerald-400 text-xs px-3 py-1.5 rounded-full font-semibold border border-emerald-800";
+            document.getElementById("roundBadge").classList.remove("hidden");
+            document.getElementById("currentRoundText").innerText = selectedRound;
+            document.getElementById("progressBarContainer").classList.remove("hidden");
+            updateProgressBar();
+
+            // 섹션 화면 전환 처리
+            document.getElementById("step1-section").classList.add("opacity-60");
+            document.getElementById("step2-section").classList.remove("hidden");
+            document.getElementById("step3-section").classList.add("hidden");
+
+            // 경기 카드 양식 및 초기 랭킹 보드 렌더링 시작
+            renderMatchCards();
+            updateTurnIndicator();
+            renderRankingBoard();
+        }
+
+        // 상단 진행 프로그레스 바 갱신
+        function updateProgressBar() {
+            const percentage = (currentPlayerIndex / players.length) * 100;
+            document.getElementById("progressBar").style.width = `${percentage}%`;
+        }
+
+        // 경기 선택 예측 카드 UI 컴포넌트 렌더링
+        function renderMatchCards() {
+            const container = document.getElementById("matchCardsContainer");
+            container.innerHTML = "";
+
+            sampleMatches.forEach(match => {
+                const cardHTML = `
+                    <div class="bg-slate-900/90 border border-slate-700/60 p-5 rounded-xl shadow-md transition-all hover:border-emerald-500/50">
+                        <div class="flex justify-between items-center text-xs text-slate-400 mb-3">
+                            <span class="bg-slate-800 px-2.5 py-1 rounded border border-slate-700">MATCH ${match.id}</span>
+                            <span class="text-emerald-400 font-semibold"><i class="fa-regular fa-clock"></i> 전반 00:00 KICK OFF 전</span>
+                        </div>
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex-1 flex items-center justify-end gap-3">
+                                <span class="font-bold text-base md:text-lg text-slate-100">${match.home} <span class="text-sm">${match.homeLogo}</span></span>
+                                <input type="number" id="match-${match.id}-home" min="0" value="0" 
+                                       class="w-14 bg-slate-800 border border-slate-600 rounded-lg text-center py-1.5 font-bold text-slate-100 focus:outline-none focus:border-emerald-500">
+                            </div>
+                            
+                            <div class="text-center px-3 text-slate-500 font-bold text-sm">VS</div>
+                            
+                            <div class="flex-1 flex items-center justify-start gap-3">
+                                <input type="number" id="match-${match.id}-away" min="0" value="0" 
+                                       class="w-14 bg-slate-800 border border-slate-600 rounded-lg text-center py-1.5 font-bold text-slate-100 focus:outline-none focus:border-emerald-500">
+                                <span class="font-bold text-base md:text-lg text-slate-100"><span class="text-sm">${match.awayLogo}</span> ${match.away}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += cardHTML;
+            });
+        }
+
+        // 턴 상태 인디케이터 라벨 변경 적용
+        function updateTurnIndicator() {
+            if (currentPlayerIndex < players.length) {
+                document.getElementById("currentPlayerName").innerText = players[currentPlayerIndex].name;
+            }
+        }
+
+        // 개별 참가자 예측 제출 핸들링 기능
+        function submitPrediction() {
+            const player = players[currentPlayerIndex];
+            const currentPredictions = [];
+
+            // 각 매치별 입력 데이터 수집 유효성 검사
+            for (let match of sampleMatches) {
+                const homeScoreStr = document.getElementById(`match-${match.id}-home`).value;
+                const awayScoreStr = document.getElementById(`match-${match.id}-away`).value;
+
+                if (homeScoreStr === "" || awayScoreStr === "") {
+                    showToast("스코어를 공란 없이 모두 작성해 주세요!");
+                    return;
+                }
+
+                const homeScore = parseInt(homeScoreStr);
+                const awayScore = parseInt(awayScoreStr);
+
+                // 승(W), 무(D), 패(L) 문자형태의 내부 규격 계산 정의
+                let predictionWDL = "D";
+                if (homeScore > awayScore) predictionWDL = "W";
+                else if (homeScore < awayScore) predictionWDL = "L";
+
+                currentPredictions.push({
+                    matchId: match.id,
+                    homeScore: homeScore,
+                    awayScore: awayScore,
+                    wdl: predictionWDL
+                });
+            }
+
+            // 플레이어 별 제출 정보 바인딩
+            predictionsData[player.name] = currentPredictions;
+            player.submitTime = new Date().getTime(); // 동점 우선순위 정산용 타임스탬프
+
+            // 다음 사람 턴 이동 분기점 계산
+            currentPlayerIndex++;
+            updateProgressBar();
+
+            if (currentPlayerIndex < players.length) {
+                updateTurnIndicator();
+                // 다음 사람을 위해 입력 폼 0으로 초기셋업 리셋
+                sampleMatches.forEach(match => {
+                    document.getElementById(`match-${match.id}-home`).value = "0";
+                    document.getElementById(`match-${match.id}-away`).value = "0";
+                });
+                showToast(`${player.name}님의 예측이 기록되었습니다. 다음 차례 진행하세요.`);
+            } else {
+                // 전원 제출 시 스코어 입력 관리자 마스터 보드로 전환 진입
+                showToast("모든 참가자의 예측 데이터가 완료되었습니다! 실제 결과를 기입하세요.");
+                document.getElementById("step2-section").classList.add("hidden");
+                document.getElementById("step3-section").classList.remove("hidden");
+                renderResultCards();
+            }
+        }
+
+        // 3단계용 실제 경기 결과 수집 카드 그리기
+        function renderResultCards() {
+            const container = document.getElementById("resultCardsContainer");
+            container.innerHTML = "";
+
+            sampleMatches.forEach(match => {
+                const cardHTML = `
+                    <div class="bg-slate-900 border-2 border-slate-700 p-4 rounded-xl flex items-center justify-between">
+                        <span class="text-sm font-semibold text-emerald-400 w-16">경기 ${match.id}</span>
+                        <div class="flex items-center gap-2 justify-center flex-1">
+                            <span class="text-sm text-slate-200 font-bold">${match.home}</span>
+                            <input type="number" id="result-${match.id}-home" min="0" value="1" class="w-12 bg-slate-800 text-center rounded text-amber-300 font-bold py-1">
+                            <span class="text-slate-400">:</span>
+                            <input type="number" id="result-${match.id}-away" min="0" value="1" class="w-12 bg-slate-800 text-center rounded text-amber-300 font-bold py-1">
+                            <span class="text-sm text-slate-200 font-bold">${match.away}</span>
+                        </div>
+                    </div>
+                `;
+                container.innerHTML += cardHTML;
+            });
+        }
+
+        // 핵심 로직: 예측 점수 및 승률 자동 정산 계산 알고리즘 수행
+        function calculateScores() {
+            const actualResults = {};
+
+            // 실제 입력 결과 데이터 구조화
+            for (let match of sampleMatches) {
+                const homeScoreStr = document.getElementById(`result-${match.id}-home`).value;
+                const awayScoreStr = document.getElementById(`result-${match.id}-away`).value;
+
+                if (homeScoreStr === "" || awayScoreStr === "") {
+                    showToast("실제 경기 스코어 결과를 완전하게 입력해주세요.");
+                    return;
+                }
+
+                const homeScore = parseInt(homeScoreStr);
+                const awayScore = parseInt(awayScoreStr);
+
+                let actualWDL = "D";
+                if (homeScore > awayScore) actualWDL = "W";
+                else if (homeScore < awayScore) actualWDL = "L";
+
+                actualResults[match.id] = {
+                    homeScore: homeScore,
+                    awayScore: awayScore,
+                    wdl: actualWDL
+                };
+            }
+
+            // 애니메이션 연출을 위해 각 참가자 이전 점수 캐싱 백업
+            scoresAnimationState = {};
+            players.forEach(p => {
+                scoresAnimationState[p.name] = p.score;
+            });
+
+            // 각 유저별 예측 데이터 정밀 채점 연산
+            players.forEach(player => {
+                let currentScore = 0;
+                let correctCount = 0;
+                const userPredictions = predictionsData[player.name] || [];
+
+                userPredictions.forEach(pred => {
+                    const actual = actualResults[pred.matchId];
+                    if (!actual) return;
+
+                    // 규칙 1: 승무패 예측 성공 여부 대조 판정
+                    if (pred.wdl === actual.wdl) {
+                        currentScore += 10; // 맞추면 10점 획득
+                        correctCount++;
+
+                        // 필수 고도화 가점: 스코어 정합성까지 완전 일치 시 보너스 5점
+                        if (pred.homeScore === actual.homeScore && pred.awayScore === actual.awayScore) {
+                            currentScore += 5;
+                        }
+                    } else {
+                        currentScore -= 5; // 틀리면 5점 삭감 차감 규칙 적용
+                    }
+                });
+
+                player.score = currentScore;
+                player.correctCount = correctCount;
+                player.winRate = Math.round((correctCount / player.totalCount) * 100);
+            });
+
+            // 결과 보드 전면 갱신 및 우승자 전광판 띄우기
+            renderRankingBoard(true);
+            showToast("실시간 경기 스코어 채점 정산이 완료되었습니다!");
+        }
+
+        // 실시간 랭킹 보드 출력 화면 갱신 메소드
+        function renderRankingBoard(isCalculated = false) {
+            const rankingList = document.getElementById("rankingList");
+            rankingList.innerHTML = "";
+
+            if (players.length === 0) {
+                rankingList.innerHTML = `<p class="text-center text-slate-500 text-sm py-8">아직 개설된 방이 없습니다.</p>`;
+                return;
+            }
+
+            // [정렬 정산 기준 수립]: 1순위 고득점자순 -> 2순위 동점시 맞춘 횟수 다득점자 -> 3순위 제출 타임스탬프 선착순 최적화
+            const sortedPlayers = [...players].sort((a, b) => {
+                if (b.score !== a.score) return b.score - a.score;
+                if (b.correctCount !== a.correctCount) return b.correctCount - a.correctCount;
+                return (a.submitTime || 0) - (b.submitTime || 0);
+            });
+
+            sortedPlayers.forEach((player, index) => {
+                const rank = index + 1;
+                const prevScore = scoresAnimationState[player.name] !== undefined ? scoresAnimationState[player.name] : 0;
+                const scoreDiff = player.score - prevScore;
+
+                // 점수 가감 추적 부호 라벨 생성
+                let diffBadge = "";
+                if (isCalculated) {
+                    if (scoreDiff > 0) diffBadge = `<span class="score-up text-xs font-bold ml-2"><i class="fa-solid fa-caret-up"></i> +${scoreDiff}</span>`;
+                    else if (scoreDiff < 0) diffBadge = `<span class="score-down text-xs font-bold ml-2"><i class="fa-solid fa-caret-down"></i> ${scoreDiff}</span>`;
+                    else diffBadge = `<span class="text-slate-500 text-xs font-bold ml-2"> 0</span>`;
+                }
+
+                // 등수별 왕관 메달 컬러 분기 처리
+                let rankIcon = `<span class="text-slate-400 font-bold text-sm">${rank}위</span>`;
+                if (rank === 1) rankIcon = `<i class="fa-solid fa-medal text-amber-400 text-lg"></i>`;
+                if (rank === 2) rankIcon = `<i class="fa-solid fa-medal text-slate-300 text-lg"></i>`;
+                if (rank === 3) rankIcon = `<i class="fa-solid fa-medal text-amber-700 text-lg"></i>`;
+
+                const rowHTML = `
+                    <div class="flex items-center justify-between bg-slate-900/60 border border-slate-700/60 p-3.5 rounded-xl transition-all duration-500">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 text-center">${rankIcon}</div>
+                            <div>
+                                <span class="font-bold text-slate-100">${player.name}</span>
+                                <div class="text-[10px] text-slate-400">정답률: ${player.winRate}% (${player.correctCount}/${player.totalCount} 경기)</div>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-base font-black text-emerald-400">${player.score}점</span>
+                            <div>${diffBadge}</div>
+                        </div>
+                    </div>
+                `;
+                rankingList.innerHTML += rowHTML;
+            });
+
+            // 정산 계산 완료 단계일 때 [우승자 하이라이트 인터페이스] 가동 활성화
+            if (isCalculated && sortedPlayers.length > 0) {
+                const winner = sortedPlayers[0];
+                document.getElementById("winnerName").innerText = `${winner.name} (${winner.score}점)`;
+                
+                const highlightDiv = document.getElementById("winnerHighlight");
+                highlightDiv.classList.remove("hidden");
+                // 골드 레이아웃 스타일 래퍼 주입 효과 추가
+                highlightDiv.className = "mt-6 p-5 rounded-xl winner-card transition-all duration-1000 transform scale-105";
+            }
+        }
+    </script>
+</body>
+</html>
+
+```
